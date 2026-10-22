@@ -14,6 +14,7 @@ const slug = (s: string) =>
 export function AgentEditor({ agent, onClose }: { agent: Agent | null; onClose: () => void }) {
   const agents = useWorkspace((s) => s.org.agents);
   const busy = useWorkspace((s) => Object.values(s.threads).some((t) => t.busy));
+  const local = useWorkspace((s) => s.local);
   const isNew = agent === null;
   const [form, setForm] = useState<Agent>(() =>
     agent ?? {
@@ -28,6 +29,7 @@ export function AgentEditor({ agent, onClose }: { agent: Agent | null; onClose: 
     },
   );
   const set = (patch: Partial<Agent>) => setForm((f) => ({ ...f, ...patch }));
+  const setLocal = (patch: NonNullable<Agent["local"]>) => setForm((f) => ({ ...f, local: { ...f.local, ...patch } }));
   const valid = form.name.trim() && form.title.trim() && form.mission.trim();
 
   const save = () => {
@@ -110,6 +112,47 @@ export function AgentEditor({ agent, onClose }: { agent: Agent | null; onClose: 
         />
         Can search the web (Opus and Sonnet only)
       </label>
+
+      {local && (
+        <fieldset className="mt-5 space-y-3 rounded-xl border border-line p-4">
+          <legend className="px-1 text-sm font-semibold">Local mode</legend>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm">
+              <span className="mb-1 block text-muted">Role (what tools they get)</span>
+              <select className={inputCls} value={form.local?.role ?? "builder"} onChange={(e) => setLocal({ role: e.target.value })}>
+                {local.roles.map((r) => (
+                  <option key={r.id} value={r.id} title={r.description}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-muted">Working folder</span>
+              <input
+                className={`${inputCls} font-mono text-xs`}
+                value={form.local?.folder ?? ""}
+                placeholder={`${local.root ?? "~/AgentStaff"}/${form.id || "agent-id"}`}
+                onChange={(e) => setLocal({ folder: e.target.value || undefined })}
+              />
+            </label>
+          </div>
+          <p className="text-xs text-muted">{local.roles.find((r) => r.id === (form.local?.role ?? "builder"))?.description}</p>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={!!form.local?.alwaysAsk} onChange={(e) => setLocal({ alwaysAsk: e.target.checked })} />
+            Always ask: show me every tool use to approve or deny
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.local?.verifyAfterChange !== false}
+              onChange={(e) => setLocal({ verifyAfterChange: e.target.checked })}
+            />
+            After changing files, ask the agent to verify its work
+          </label>
+          {form.id && local.folderErrors[form.id] && <p className="text-xs text-rose-600">{local.folderErrors[form.id]}</p>}
+        </fieldset>
+      )}
 
       <div className="mt-6 flex items-center gap-2">
         {!isNew && (

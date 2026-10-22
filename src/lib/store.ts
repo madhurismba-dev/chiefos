@@ -9,7 +9,7 @@ import type { AuthorId, BoardTask, ChatMessage, Org, Settings, Thread, Usage, Vi
  * and components subscribe with useWorkspace(). Real workspaces persist to localStorage; the demo doesn't.
  */
 
-const STATE_KEY = "agentstaff:workspace:v1";
+let STATE_KEY = "agentstaff:workspace:v1";
 const KEY_KEY = "agentstaff:apiKey";
 const LEGACY = { "chiefos:workspace:v1": STATE_KEY, "chiefos:apiKey": KEY_KEY };   // the app's earlier name
 
@@ -61,9 +61,14 @@ export function setState(update: (s: WorkspaceState) => WorkspaceState) {
   saveTimer = setTimeout(save, 400);
 }
 
-function subscribe(l: () => void) {
+export function subscribe(l: () => void) {
   listeners.add(l);
   return () => listeners.delete(l);
+}
+
+/** Local mode keeps its workspace apart from the browser-mode one (they can share an origin under `next dev`). */
+export function setLocalStorageKey() {
+  STATE_KEY = "agentstaff:local:workspace:v1";
 }
 
 export function useWorkspace<T>(select: (s: WorkspaceState) => T): T {
@@ -79,7 +84,9 @@ function save() {
       localStorage.setItem(KEY_KEY, state.settings.apiKey);
       return;
     }
-    const { settings, ...rest } = state;
+    const { settings, local, approvals, ...rest } = state;
+    void local; // connection state and pending approvals belong to this session only
+    void approvals;
     // Never write streaming/busy flags; a reload mid-run shouldn't leave agents "working" forever.
     const threads = Object.fromEntries(
       Object.entries(rest.threads).map(([id, t]) => [
@@ -118,7 +125,7 @@ export function loadSaved(): boolean {
 }
 
 export function replaceWorkspace(next: WorkspaceState) {
-  setState(() => ({ ...next, booted: true }));
+  setState((s) => ({ ...next, booted: true, local: s.local, approvals: s.approvals }));
 }
 
 export function markBooted() {

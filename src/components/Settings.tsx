@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { stopDemo } from "@/lib/demo";
 import { MODEL_LABELS } from "@/lib/engine";
+import { resetLocalSessions } from "@/lib/local/client";
 import * as store from "@/lib/store";
 import { useWorkspace } from "@/lib/store";
 import { TEMPLATES, cloneOrg } from "@/lib/templates";
@@ -25,6 +26,7 @@ export function Settings({ onClose, reason }: { onClose: () => void; reason?: st
     stopDemo();
     const org = cloneOrg(TEMPLATES.find((t) => t.id === template) ?? TEMPLATES[0]);
     store.replaceWorkspace(store.freshWorkspace(org, { ...s.settings, apiKey: key.trim() }));
+    if (s.local) resetLocalSessions(); // a new team starts with fresh agent sessions
     onClose();
   };
 
@@ -43,6 +45,17 @@ export function Settings({ onClose, reason }: { onClose: () => void; reason?: st
     <Modal title="Settings" onClose={onClose} wide>
       {reason && <p className="mb-4 rounded-lg bg-accent-soft px-3 py-2 text-sm">{reason}</p>}
 
+      {s.local ? (
+        <section className="space-y-1 text-sm">
+          <h3 className="font-semibold">Local mode</h3>
+          <p className="text-xs text-muted">
+            Each agent runs as its own Claude Agent SDK session on this machine, in its own folder under{" "}
+            <span className="font-mono">{s.local.root ?? "~/AgentStaff"}</span>. Credentials:{" "}
+            {s.local.auth?.detail ?? "checking…"}. The key never reaches this page. Model, effort and the budget per
+            request below apply here too.
+          </p>
+        </section>
+      ) : (
       <section className="space-y-2">
         <h3 className="text-sm font-semibold">Anthropic API key</h3>
         <div className="flex gap-2">
@@ -68,6 +81,7 @@ export function Settings({ onClose, reason }: { onClose: () => void; reason?: st
           Anthropic directly for what you use; the sidebar shows an estimate.
         </p>
       </section>
+      )}
 
       <section className="mt-6">
         <h3 className="mb-2 text-sm font-semibold">Cost mode</h3>

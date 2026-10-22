@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { TaskBoard } from "@/components/TaskBoard";
 import { ThreadView } from "@/components/ThreadView";
 import { playDemo } from "@/lib/demo";
+import { connectLocal, detectLocal } from "@/lib/local/client";
 import * as store from "@/lib/store";
 import { useWorkspace } from "@/lib/store";
 import type { Agent } from "@/lib/types";
@@ -20,6 +21,14 @@ export default function Home() {
   const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
+    // Local mode (v2): opened from the link `npm run local` prints. Agents run on this machine, no demo.
+    if (detectLocal()) {
+      store.setLocalStorageKey();
+      if (store.loadSaved()) store.markBooted();
+      else store.replaceWorkspace(store.freshWorkspace());
+      connectLocal();
+      return;
+    }
     // First visit: play the sample workspace. Returning visitors get their saved workspace.
     if (store.loadSaved()) store.markBooted();
     else playDemo();

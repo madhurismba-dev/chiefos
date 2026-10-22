@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { isConfigured, sendFromCeo, stopThread } from "@/lib/engine";
+import { answerApproval, localSend, localStop } from "@/lib/local/client";
+import type { PendingApproval } from "@/lib/local/protocol";
 import * as store from "@/lib/store";
 import { useWorkspace } from "@/lib/store";
 import type { Agent, ChatMessage } from "@/lib/types";
@@ -23,6 +25,8 @@ export function ThreadView({ threadId, onNeedKey, onEdit }: { threadId: string; 
   const thread = useWorkspace((s) => s.threads[threadId]);
   const agents = useWorkspace((s) => s.org.agents);
   const demo = useWorkspace((s) => s.demo);
+  const local = useWorkspace((s) => s.local);
+  const allApprovals = useWorkspace((s) => s.approvals);
   const [draft, setDraft] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -44,10 +48,21 @@ export function ThreadView({ threadId, onNeedKey, onEdit }: { threadId: string; 
   const responder = agentOf(isDm ? thread.members[0] : thread.members[1]);
   const asker = isDm ? undefined : agentOf(thread.members[0]);
   const boss = responder?.reportsTo ? agentOf(responder.reportsTo) : undefined;
+  const approvals = (allApprovals ?? []).filter((a) => a.threadId === threadId);
+  const folder = local && responder ? local.folders[responder.id] : undefined;
+  const role = local && responder ? local.roles.find((r) => r.id === (responder.local?.role ?? "builder")) : undefined;
 
   const send = (text: string) => {
     const t = text.trim();
     if (!t || !responder || thread.busy) return;
+    if (local) {
+      // Local mode: the agent runs as a Claude Code session on this machine; the server streams it back.
+      if (local.status !== "ready") return;
+      setDraft("");
+      stick.current = true;
+      localSend(responder.id, t);
+      return;
+    }
     if (demo || !isConfigured()) {
       onNeedKey();
       return;
@@ -71,6 +86,13 @@ export function ThreadView({ threadId, onNeedKey, onEdit }: { threadId: string; 
                 {thread.busy ? "Working…" : `Reports to ${boss ? boss.name : "you"}`}
                 {responder?.tools.includes("web_search") && " · can search the web"}
               </p>
+              {local && (
+                <p className="truncate font-mono text-[11px] text-muted" title={folder}>
+                  {folder ?? local.folderErrors[responder?.id ?? ""] ?? "…"}
+                  {role && ` · ${role.label}`}
+                  {responder?.local?.alwaysAsk && " · asks before every tool"}
+                </p>
+              )}
             </div>
           </>
         ) : (
@@ -83,7 +105,7 @@ export function ThreadView({ threadId, onNeedKey, onEdit }: { threadId: string; 
         )}
         <div className="ml-auto flex shrink-0 items-center gap-2">
           {thread.busy && isDm && !demo && (
-            <button onClick={() => stopThread(thread.id)} className="rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-accent-soft">
+            <button onClick={() => (local ? localStop(thread.id) : stopThread(thread.id))} className="rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-accent-soft">
               Stop
             </button>
           )}
@@ -129,6 +151,9 @@ export function ThreadView({ threadId, onNeedKey, onEdit }: { threadId: string; 
           {thread.messages.map((m) => (
             <Message key={m.id} m={m} agentOf={agentOf} />
           ))}
+          {approvals.map((a) => (
+            <ApprovalCard key={a.id} a={a} agent={agentOf(a.agentId)} />
+          ))}
           {thread.busy && !thread.messages.some((m) => m.streaming && m.text) && (
             <div className="flex items-center gap-2 pl-11 text-sm text-muted">
               <span className="working-dot h-2 w-2 rounded-full bg-emerald-500" /> {responder?.name} is working…
@@ -156,8 +181,14 @@ export function ThreadView({ threadId, onNeedKey, onEdit }: { threadId: string; 
                 }
               }}
               rows={Math.min(6, Math.max(1, draft.split("\n").length))}
-              placeholder={thread.busy ? `${responder?.name} is working… chat with others meanwhile` : `Message ${responder?.name}`}
-              disabled={thread.busy}
+              placeholder={
+                local && local.status !== "ready"
+                  ? "Connecting to the local server…"
+                  : thread.busy
+                    ? `${responder?.name} is working… chat with others meanwhile`
+                    : `Message ${responder?.name}`
+              }
+              disabled={thread.busy || (!!local && local.status !== "ready")}
               aria-label={`Message ${responder?.name}`}
               className="flex-1 resize-none rounded-xl border border-line bg-bg px-4 py-2.5 text-[14.5px] outline-none focus:border-accent disabled:opacity-60"
             />
@@ -176,6 +207,30 @@ export function ThreadView({ threadId, onNeedKey, onEdit }: { threadId: string; 
         </div>
       )}
     </section>
+  );
+}
+
+/** Local mode: a tool use waiting for your OK. */
+function ApprovalCard({ a, agent }: { a: PendingApproval; agent?: Agent }) {
+  return (
+    <div className="ml-11 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/40">
+      <div className="font-medium">
+        {agent?.name ?? a.agentId} wants to run <span className="font-mono">{a.summary}</span>
+      </div>
+      <div className="mt-0.5 text-xs text-muted">{a.reason}</div>
+      <details className="mt-2">
+        <summary className="cursor-pointer text-xs text-muted">Full input</summary>
+        <pre className="mt-1 max-h-48 overflow-auto rounded bg-bg p-2 text-[11.5px] whitespace-pre-wrap">{a.detail}</pre>
+      </details>
+      <div className="mt-2 flex gap-2">
+        <button onClick={() => answerApproval(a.id, true)} className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">
+          Approve
+        </button>
+        <button onClick={() => answerApproval(a.id, false)} className="rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-accent-soft">
+          Deny
+        </button>
+      </div>
+    </div>
   );
 }
 

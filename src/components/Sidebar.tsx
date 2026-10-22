@@ -17,6 +17,7 @@ export function Sidebar({ onSettings, onHire, onNavigate }: { onSettings: () => 
     .sort((a, b) => b.updatedAt - a.updatedAt);
   const nameOf = (id: string) => s.org.agents.find((a) => a.id === id)?.name ?? id;
   const anyBusy = Object.values(s.threads).some((t) => t.busy);
+  const approvals = s.approvals ?? [];
   const item = (on: boolean) =>
     `flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[14px] ${
       on ? "bg-white/12 text-white" : "text-sidebar-ink hover:bg-white/6"
@@ -35,6 +36,14 @@ export function Sidebar({ onSettings, onHire, onNavigate }: { onSettings: () => 
 
       <div className="flex-1 space-y-5 overflow-y-auto px-2 py-3">
         <div className="space-y-0.5">
+          {approvals.length > 0 && (
+            <button
+              className="flex w-full items-center gap-2.5 rounded-lg bg-amber-400/15 px-2.5 py-1.5 text-left text-[14px] text-amber-200 hover:bg-amber-400/25"
+              onClick={() => go({ kind: "thread", threadId: approvals[0].threadId })}
+            >
+              <span className="w-5 text-center">✋</span> {approvals.length} waiting for your OK
+            </button>
+          )}
           <button className={item(active({ kind: "org" }))} onClick={() => go({ kind: "org" })}>
             <span className="w-5 text-center">🏢</span> Org chart
           </button>
@@ -100,6 +109,20 @@ export function Sidebar({ onSettings, onHire, onNavigate }: { onSettings: () => 
       </div>
 
       <div className="border-t border-white/8 p-3">
+        {s.local && (
+          <div className="mb-2 px-1 text-xs text-sidebar-muted" title={s.local.error}>
+            <span
+              className={`mr-1.5 inline-block h-2 w-2 rounded-full ${
+                s.local.status === "ready" ? "bg-emerald-400" : s.local.status === "connecting" ? "bg-amber-400" : "bg-rose-400"
+              }`}
+            />
+            Local mode · {s.local.status === "ready" ? "connected" : s.local.status}
+            {s.local.status === "ready" && s.local.auth?.mode === "missing" && (
+              <span className="block text-rose-300">No ANTHROPIC_API_KEY on the server</span>
+            )}
+            {s.local.status === "disconnected" && <span className="block">{s.local.error}</span>}
+          </div>
+        )}
         {s.demo ? (
           <div className="mb-2 px-1 text-xs text-sidebar-muted">Sample workspace · no API calls</div>
         ) : (

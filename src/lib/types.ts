@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import type { AuthInfo, PendingApproval, RoleInfo } from "./local/protocol";
 
 export type AgentTool = "web_search";
 
@@ -12,6 +13,13 @@ export interface Agent {
   reportsTo: string | null; // agent id, or null = reports to the CEO (you)
   mission: string; // becomes the agent's system prompt
   tools: AgentTool[];
+  /** Local mode (v2) only: role, approvals and working folder. Ignored in browser mode. */
+  local?: {
+    role?: string;
+    alwaysAsk?: boolean;
+    verifyAfterChange?: boolean;
+    folder?: string;
+  };
 }
 
 export interface Org {
@@ -98,4 +106,19 @@ export interface WorkspaceState {
   view: View;
   demo: boolean; // true while showing the pre-written sample workspace
   booted?: boolean; // set once the saved workspace (or the demo) has loaded in the browser
+  /** Set only in local mode (v2): connection to the local server. Never persisted. */
+  local?: LocalStatus;
+  /** Local mode: tool uses waiting for your approve/deny. Never persisted. */
+  approvals?: PendingApproval[];
+}
+
+export interface LocalStatus {
+  status: "connecting" | "ready" | "disconnected";
+  version?: string;
+  auth?: AuthInfo;
+  root?: string;
+  roles: RoleInfo[];
+  folders: Record<string, string>;
+  folderErrors: Record<string, string>;
+  error?: string;
 }
