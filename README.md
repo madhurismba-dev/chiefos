@@ -181,6 +181,8 @@ on your machine and each agent becomes its own [Claude Agent SDK](https://code.c
 session (the same agent loop and tools as Claude Code), working in its own folder. The UI is the same: DMs,
 agent-to-agent threads, the org chart and the cost meter all work as before, and tool calls show up inline.
 
+![Local mode: a lead hands off to a builder and a read-only reviewer in parallel, and a write outside the builder's folder is blocked](docs/screenshots/local-mode.gif)
+
 Browser mode is unchanged. The hosted static site never talks to a local server; local mode turns on only when
 you open the link the server prints.
 
@@ -285,8 +287,8 @@ key while you're in API-key mode. Use of the Agent SDK is governed by
 - **Streaming is per connection.** Reload during a run and you'll see busy agents and pending approvals, but not
   the text already streamed for the current reply.
 - **Parallel hand-offs** depend on Claude Code running concurrent MCP calls; `message_colleague` is marked
-  read-only for that reason (it doesn't touch the caller's folder). This is verified with a fake SDK, not yet in a
-  live run.
+  read-only for that reason (it doesn't touch the caller's folder). In a live run on Claude Haiku, a lead's two
+  hand-offs (builder and reviewer) ran at the same time.
 - It runs on your machine with your key and your files. It's a builder's tool, not a sandbox or a hosted service.
 
 ### Extension points
