@@ -2,6 +2,8 @@
 
 *An AI agent management app, built in Claude Code.*
 
+*Original project, started in October 2026 by [Madhuri Siddulagari](https://github.com/madhurismba-dev). This repository is its only official home.*
+
 **Chat with your AI chief of staff, product manager, engineer and CFO in parallel, and watch them work with each other.**
 
 AgentStaff is a workspace laid out like Slack, where every employee is an AI agent. You're the CEO. Pick anyone in the
